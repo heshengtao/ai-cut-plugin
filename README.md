@@ -4,7 +4,7 @@
 应用默认从这里读 `index.json`：
 
 ```
-https://heshengtao.github.io/ai-cut-plugin-market/index.json
+https://heshengtao.github.io/ai-cut-plugin/index.json
 ```
 
 > 「应用扩展」不是 OFX 插件。OFX 是视频特效（走系统的 OpenFX 插件宿主）；应用扩展是 npm 包，
