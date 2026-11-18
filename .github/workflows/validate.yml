@@ -1,0 +1,47 @@
+name: Validate index
+
+on:
+  push:
+    branches: [main]
+    paths: ["index.json"]
+  pull_request:
+    paths: ["index.json"]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate index.json
+        run: |
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const doc = JSON.parse(readFileSync("index.json", "utf8"));
+            const fail = (message) => { console.error("✗", message); process.exit(1); };
+            const localized = (value) => typeof value === "string"
+              ? value.trim().length > 0
+              : value && typeof value === "object" && Object.values(value).every((text) => typeof text === "string" && text.trim().length > 0);
+            if (doc.format !== 1) fail("format 必须是 1");
+            if (!localized(doc.title)) fail("title 必须是字符串或语言映射");
+            if (!Array.isArray(doc.plugins)) fail("plugins 必须是数组");
+            const names = new Set();
+            for (const [index, plugin] of doc.plugins.entries()) {
+              const at = `plugins[${index}]`;
+              if (typeof plugin.name !== "string" || !plugin.name.trim()) fail(`${at}.name 缺失`);
+              if (names.has(plugin.name)) fail(`${at}.name 重复：${plugin.name}`);
+              names.add(plugin.name);
+              if (!Array.isArray(plugin.versions) || plugin.versions.length === 0) fail(`${at}.versions 不能为空`);
+              for (const [vIndex, version] of plugin.versions.entries()) {
+                const vAt = `${at}.versions[${vIndex}]`;
+                if (typeof version.version !== "string" || !/^\d+\.\d+\.\d+/.test(version.version)) fail(`${vAt}.version 不是 semver`);
+                if (typeof version.sha256 !== "string" || !/^[0-9a-f]{64}$/.test(version.sha256)) fail(`${vAt}.sha256 必须是 64 位小写十六进制`);
+                if (!(typeof version.size === "number" && version.size > 0)) fail(`${vAt}.size 必须大于 0`);
+                const type = version.source?.type;
+                if (type !== "npm" && type !== "tgz") fail(`${vAt}.source.type 必须是 npm 或 tgz`);
+              }
+            }
+            console.log(`✓ index.json 合法（${doc.plugins.length} 个应用扩展）`);
+          '
